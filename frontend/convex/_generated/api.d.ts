@@ -9,7 +9,6 @@
  */
 
 import type * as audit from "../audit.js";
-import type * as cleanup from "../cleanup.js";
 import type * as cross_relations from "../cross_relations.js";
 import type * as dashboards from "../dashboards.js";
 import type * as datasets from "../datasets.js";
@@ -38,7 +37,6 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   audit: typeof audit;
-  cleanup: typeof cleanup;
   cross_relations: typeof cross_relations;
   dashboards: typeof dashboards;
   datasets: typeof datasets;
