@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -25,8 +25,16 @@ function BuilderContent() {
   // Load user uploads
   const uploads = useQuery(api.uploads.listUploads, userId ? { userId } : "skip");
   const [selectedUploadId, setSelectedUploadId] = useState<string>(
-    typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("uploadId") || "") : ""
+    searchParams.get("uploadId") || ""
   );
+
+  // Sync uploadId from URL params on navigation
+  useEffect(() => {
+    const urlUploadId = searchParams.get("uploadId");
+    if (urlUploadId && urlUploadId !== selectedUploadId) {
+      setSelectedUploadId(urlUploadId);
+    }
+  }, [searchParams, selectedUploadId]);
 
   const uploadList = (uploads || []) as Array<{ _id: string; fileName: string; status: string }>;
   const completedUploads = uploadList.filter((u) => u.status === "completed");
