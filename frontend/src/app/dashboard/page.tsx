@@ -171,11 +171,24 @@ function QuickUploadZone({ onUploadComplete }: { onUploadComplete: (uploadId: st
         return row;
       });
 
-      await storeDataset({ uploadId, userId: user._id || "" as any, columns: headers, rowCount: rows.length, data: rows.slice(0, 10000) });
+      const { datasetId } = await storeDataset({ uploadId, userId: user._id || "" as any, columns: headers, rowCount: rows.length, data: rows.slice(0, 10000) });
       setProgress(100);
       toast.success("File uploaded!");
 
-      toast.success("Pipeline started!");
+      // Run pipeline
+      setProgress(0);
+      const pipelineResult = await runPipeline({
+        uploadId,
+        datasetId,
+        userId: user._id || "" as any,
+        skipCleaning: false,
+      });
+
+      if (pipelineResult.status === "completed") {
+        toast.success("Pipeline completed! Dashboard created.");
+      } else {
+        toast.error("Pipeline failed: " + (pipelineResult as any).error);
+      }
       onUploadComplete(uploadId);
     } catch (err: any) {
       toast.error(err?.message || "Upload failed");
