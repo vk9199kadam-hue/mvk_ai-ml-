@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import Layout from "@/components/Layout";
 import ConvexChartBuilder from "@/components/ConvexChartBuilder";
 
-export default function DashboardBuilderPage() {
+function BuilderContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -24,15 +24,9 @@ export default function DashboardBuilderPage() {
 
   // Load user uploads
   const uploads = useQuery(api.uploads.listUploads, userId ? { userId } : "skip");
-  const [selectedUploadId, setSelectedUploadId] = useState<string>(searchParams.get("uploadId") || "");
-
-  // Sync uploadId from URL params
-  useEffect(() => {
-    const urlUploadId = searchParams.get("uploadId");
-    if (urlUploadId && urlUploadId !== selectedUploadId) {
-      setSelectedUploadId(urlUploadId);
-    }
-  }, [searchParams]);
+  const [selectedUploadId, setSelectedUploadId] = useState<string>(
+    typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("uploadId") || "") : ""
+  );
 
   const uploadList = (uploads || []) as Array<{ _id: string; fileName: string; status: string }>;
   const completedUploads = uploadList.filter((u) => u.status === "completed");
@@ -97,5 +91,22 @@ export default function DashboardBuilderPage() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+export default function DashboardBuilderPage() {
+  return (
+    <Suspense fallback={
+      <Layout>
+        <div className="h-96 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl mx-auto mb-4 animate-pulse" />
+            <p className="text-gray-500">Loading builder...</p>
+          </div>
+        </div>
+      </Layout>
+    }>
+      <BuilderContent />
+    </Suspense>
   );
 }
