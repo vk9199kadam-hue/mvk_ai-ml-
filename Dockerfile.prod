@@ -1,0 +1,56 @@
+# =============================================================================
+# AutoInsight AI — Production Dockerfile (Phase 5, Day 49)
+# Multi-stage: optimized for production with health checks
+# =============================================================================
+
+# ── Stage 1: Python Base ───────────────────────────────────────────────────
+FROM python:3.11-slim AS python-base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+
+# ── Stage 2: Build Dependencies ────────────────────────────────────────────
+FROM python-base AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+
+# ── Stage 3: Production Image ──────────────────────────────────────────────
+FROM python-base AS production
+
+ENV DEBUG=false \
+    LOG_LEVEL=WARNING
+
+# Copy installed Python packages
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN adduser --disabled-password --gecos '' appuser && \
+    mkdir -p /app/uploads /app/logs && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=30s \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--workers", "4", "--limit-concurrency", "100", "--timeout-keep-alive", "30"]

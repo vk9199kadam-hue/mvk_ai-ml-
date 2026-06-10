@@ -1,0 +1,27 @@
+{
+  "name": "AutoInsight AI",
+  "short_name": "AutoInsight",
+  "description": "AI-powered data analysis platform with natural language querying, automated pipeline processing, and intelligent report generation.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business", "data"],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

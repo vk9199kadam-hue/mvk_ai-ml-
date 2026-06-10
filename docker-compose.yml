@@ -1,0 +1,192 @@
+# =============================================================================
+# AutoInsight AI — Docker Compose
+# Phase 1: Foundation — Local Development Infrastructure
+# =============================================================================
+# Services:
+#   api        - FastAPI backend with auto-reload
+#   worker     - Celery async task worker
+#   postgres   - PostgreSQL 15 metadata store
+#   redis      - Redis 7 cache + task queue
+#   minio      - S3-compatible file storage
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ===========================================================================
+  # FastAPI Backend
+  # ===========================================================================
+  api:
+    build:
+      context: .
+      target: development
+    container_name: autoinsight-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - api_data:/app/uploads
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://autoinsight:changeme@postgres:5432/autoinsight
+      - REDIS_URL=redis://redis:6379/0
+      - S3_ENDPOINT=http://minio:9000
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # Celery Async Worker
+  # ===========================================================================
+  worker:
+    build:
+      context: .
+      target: development
+    container_name: autoinsight-worker
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://autoinsight:changeme@postgres:5432/autoinsight
+      - REDIS_URL=redis://redis:6379/0
+      - S3_ENDPOINT=http://minio:9000
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    command: celery -A backend.tasks worker --loglevel=info --concurrency=4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # PostgreSQL 15 — Metadata Store
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: autoinsight-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/migrations:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_DB: autoinsight
+      POSTGRES_USER: autoinsight
+      POSTGRES_PASSWORD: changeme
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoinsight -d autoinsight"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # Redis 7 — Cache + Task Queue Backend
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: autoinsight-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # MinIO — S3-Compatible File Storage
+  # ===========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: autoinsight-minio
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_DOMAIN: minio
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # MinIO Bucket Initializer
+  # ===========================================================================
+  minio-init:
+    image: minio/mc:latest
+    container_name: autoinsight-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set autoinsight http://minio:9000 minioadmin minioadmin;
+      mc mb autoinsight/autoinsight-files --ignore-existing;
+      mc policy set public autoinsight/autoinsight-files;
+      echo 'MinIO bucket autoinsight-files created successfully';
+      "
+    networks:
+      - autoinsight-net
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  api_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  autoinsight-net:
+    driver: bridge

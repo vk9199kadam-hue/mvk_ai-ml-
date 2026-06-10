@@ -1,0 +1,86 @@
+# =============================================================================
+# AutoInsight AI — .gitignore
+# =============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.whl
+
+# Virtual Environment
+venv/
+.venv/
+env/
+myenv/
+env/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.coverage.*
+*.cover
+coverage.xml
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+log/
+
+# Database
+*.db
+*.sqlite
+postgres_data/
+redis_data/
+minio_data/
+
+# Reports
+reports/
+*.pdf
+*.html
+# *.md (Commented out to commit documentation markdown files)
+*.xlsx
+
+# Uploaded Files
+uploads/
+temp/
+*.csv
+*.parquet
+*.arrow
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+.docusaurus/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

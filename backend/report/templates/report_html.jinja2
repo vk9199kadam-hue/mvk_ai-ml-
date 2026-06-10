@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ report.title }}</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--gray-900);
+            line-height: 1.6;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+        .header {
+            text-align: center;
+            padding: 48px 0 32px;
+            border-bottom: 3px solid var(--primary);
+            margin-bottom: 32px;
+        }
+        .header h1 { font-size: 2.2em; color: var(--gray-900); margin-bottom: 8px; }
+        .header .meta { color: var(--gray-700); font-size: 0.9em; }
+        .header .meta span { margin: 0 12px; }
+        .confidence-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .badge-green { background: #dcfce7; color: #166534; }
+        .badge-yellow { background: #fef3c7; color: #92400e; }
+        .badge-orange { background: #ffedd5; color: #9a3412; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .summary-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            padding: 24px;
+            background: var(--gray-50);
+            border-radius: 12px;
+            margin-bottom: 32px;
+        }
+        .summary-item { text-align: center; }
+        .summary-item .value { font-size: 1.8em; font-weight: 700; color: var(--primary); }
+        .summary-item .label { font-size: 0.8em; color: var(--gray-700); margin-top: 4px; }
+        .section {
+            margin-bottom: 32px;
+            padding: 24px;
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+        }
+        .section h2 {
+            font-size: 1.4em;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--gray-100);
+        }
+        .section .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .section .content { white-space: pre-wrap; }
+        .section .content h3 { margin: 16px 0 8px; }
+        .section .content ul, .section .content ol { padding-left: 24px; margin: 8px 0; }
+        .section .content li { margin: 4px 0; }
+        .section .content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+        }
+        .section .content th, .section .content td {
+            padding: 8px 12px;
+            border: 1px solid var(--gray-200);
+            text-align: left;
+        }
+        .section .content th { background: var(--gray-50); font-weight: 600; }
+        .section .content blockquote {
+            border-left: 4px solid var(--primary);
+            padding: 8px 16px;
+            margin: 12px 0;
+            background: var(--gray-50);
+            border-radius: 0 8px 8px 0;
+        }
+        .section .content code {
+            background: var(--gray-100);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .section .confidence-score {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chart-placeholder {
+            background: var(--gray-50);
+            border: 2px dashed var(--gray-200);
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 16px 0;
+            color: var(--gray-700);
+        }
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--gray-700);
+            font-size: 0.85em;
+            border-top: 1px solid var(--gray-200);
+            margin-top: 48px;
+        }
+        @media print {
+            body { padding: 0; }
+            .section { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ report.title }}</h1>
+        <div class="meta">
+            <span>Generated: {{ report.generated_at }}</span>
+            <span>|</span>
+            <span>Report ID: {{ report.report_id[:12] }}...</span>
+        </div>
+        <div style="margin-top: 12px;">
+            <span class="confidence-badge 
+                {%- if report.overall_confidence >= 0.90 %}badge-green
+                {%- elif report.overall_confidence >= 0.70 %}badge-yellow
+                {%- elif report.overall_confidence >= 0.50 %}badge-orange
+                {%- else %}badge-red{% endif %}">
+                Overall Confidence: {{ "%.0f"|format(report.overall_confidence * 100) }}%
+            </span>
+        </div>
+    </div>
+
+    <div class="summary-bar">
+        <div class="summary-item">
+            <div class="value">{{ report.sections|length }}</div>
+            <div class="label">Sections</div>
+        </div>
+        <div class="summary-item">
+            <div class="value">{{ "%.0f"|format(report.overall_confidence * 100) }}%</div>
+            <div class="label">Avg Confidence</div>
+        </div>
+        <div class="summary-item">
+            <div class="value">{{ report.audit_trail|length }}</div>
+            <div class="label">Audit Entries</div>
+        </div>
+    </div>
+
+    {% for section in report.sections %}
+    <div class="section">
+        <div class="section-header">
+            <h2>{{ section.title }}</h2>
+            <span class="confidence-score">
+                <span class="confidence-badge 
+                    {%- if section.confidence >= 0.90 %}badge-green
+                    {%- elif section.confidence >= 0.70 %}badge-yellow
+                    {%- elif section.confidence >= 0.50 %}badge-orange
+                    {%- else %}badge-red{% endif %}">
+                    {{ "%.0f"|format(section.confidence * 100) }}%
+                </span>
+            </span>
+        </div>
+        <div class="content">{{ section.content }}</div>
+        {% if section.chart_hints %}
+        <div class="chart-placeholder">
+            📊 Interactive chart available in web viewer
+            <br><small>{{ section.chart_hints|length }} chart(s) configured</small>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        <p>Generated by <strong>AutoInsight AI</strong> — Agentic Data Analysis & Report Generation System</p>
+        <p>Qwen 2.5 72B (Groq) | LangGraph Orchestration | Polars Data Engine</p>
+        <p style="margin-top: 8px; font-size: 0.85em;">© 2026 AutoInsight AI. All rights reserved.</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,81 @@
+name: AutoInsight AI — CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Quality Check ─────────────────────────────────────────────────────
+  quality:
+    name: Quality Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+        continue-on-error: true  # _generated/ types need convex dev
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+  # ── Convex Deploy ─────────────────────────────────────────────────────
+  deploy-convex:
+    name: Deploy Convex
+    needs: quality
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Deploy to Convex
+        uses: convex-dev/action@v1
+        with:
+          convex-deploy-key: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          working-directory: frontend
+
+  # ── Vercel Deploy ─────────────────────────────────────────────────────
+  deploy-vercel:
+    name: Deploy Vercel
+    needs: quality
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: "--prod"
+          working-directory: frontend

@@ -1,0 +1,323 @@
+# =============================================================================
+# AutoInsight AI — Production Docker Compose (Phase 5, Day 49)
+# =============================================================================
+# Usage: docker compose -f docker-compose.prod.yml up -d
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # FastAPI Backend (Production)
+  # ===========================================================================
+  api:
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile.prod
+    image: ghcr.io/autoinsight-ai/backend:latest
+    container_name: autoinsight-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - api_data:/app/uploads
+      - api_logs:/app/logs
+    env_file:
+      - .env.production
+    environment:
+      - DATABASE_URL=postgresql://autoinsight:${DB_PASSWORD}@postgres:5432/autoinsight
+      - REDIS_URL=redis://redis:6379/0
+      - S3_ENDPOINT=http://minio:9000
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - DEBUG=false
+      - LOG_LEVEL=WARNING
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # Nginx Reverse Proxy (Frontend + API routing)
+  # ===========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: autoinsight-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/out:/usr/share/nginx/html:ro
+      - nginx_logs:/var/log/nginx
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # Celery Worker
+  # ===========================================================================
+  worker:
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile.prod
+    image: ghcr.io/autoinsight-ai/worker:latest
+    container_name: autoinsight-worker
+    volumes:
+      - worker_data:/tmp/autoinsight
+    env_file:
+      - .env.production
+    environment:
+      - DATABASE_URL=postgresql://autoinsight:${DB_PASSWORD}@postgres:5432/autoinsight
+      - REDIS_URL=redis://redis:6379/0
+      - S3_ENDPOINT=http://minio:9000
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - DEBUG=false
+    command: celery -A backend.tasks worker --loglevel=warning --concurrency=8
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # PostgreSQL 15
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: autoinsight-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/migrations:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_DB: autoinsight
+      POSTGRES_USER: autoinsight
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoinsight -d autoinsight"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # Redis 7
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: autoinsight-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # MinIO S3 Storage
+  # ===========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: autoinsight-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # MinIO Bucket Initializer
+  # ===========================================================================
+  minio-init:
+    image: minio/mc:latest
+    container_name: autoinsight-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set autoinsight http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      mc mb autoinsight/autoinsight-files --ignore-existing;
+      mc anonymous set public autoinsight/autoinsight-files;
+      echo 'Bucket ready';
+      "
+    networks:
+      - autoinsight-net
+
+  # ===========================================================================
+  # Prometheus Monitoring (Optional)
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: autoinsight-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - autoinsight-net
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  api_data:
+    driver: local
+  api_logs:
+    driver: local
+  worker_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+
+networks:
+  autoinsight-net:
+    driver: bridge
