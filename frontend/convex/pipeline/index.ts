@@ -22,7 +22,7 @@ export const runPipeline = action({
     const startTime = Date.now();
 
     // Create pipeline result
-    const pipelineId = (await ctx.runMutation(internal.pipeline.initPipeline, {
+    const pipelineId = (await ctx.runMutation(internal.pipeline.index.initPipeline, {
       uploadId: args.uploadId,
       userId: args.userId,
     })) as any;
@@ -43,7 +43,7 @@ export const runPipeline = action({
         allColumns: columns,
       });
 
-      await ctx.runMutation(internal.pipeline.updatePipelineStage, {
+      await ctx.runMutation(internal.pipeline.index.updatePipelineStage, {
         pipelineId,
         stageNum: 1,
         stageName: "Schema Inference",
@@ -67,7 +67,7 @@ export const runPipeline = action({
         cleaningResult = { skipped: true, cleanedData: data, qualityProfile: {}, cleaningPlan: {}, rowCountBefore: data.length, rowCountAfter: data.length };
       }
 
-      await ctx.runMutation(internal.pipeline.updatePipelineStage, {
+      await ctx.runMutation(internal.pipeline.index.updatePipelineStage, {
         pipelineId,
         stageNum: 2,
         stageName: args.skipCleaning ? "Data Cleaning (skipped)" : "Data Cleaning",
@@ -81,7 +81,7 @@ export const runPipeline = action({
         schema: schemaResult,
       });
 
-      await ctx.runMutation(internal.pipeline.updatePipelineStage, {
+      await ctx.runMutation(internal.pipeline.index.updatePipelineStage, {
         pipelineId,
         stageNum: 3,
         stageName: "LangGraph Agent",
@@ -110,7 +110,7 @@ export const runPipeline = action({
 
       // Save pipeline result
       const processingTimeMs = Date.now() - startTime;
-      await ctx.runMutation(internal.pipeline.completePipeline, {
+      await ctx.runMutation(internal.pipeline.index.completePipeline, {
         pipelineId,
         unifiedDataModel,
         processingTimeMs,
@@ -131,7 +131,7 @@ export const runPipeline = action({
         processingTimeMs,
       };
     } catch (error: any) {
-      await ctx.runMutation(internal.pipeline.failPipeline, {
+      await ctx.runMutation(internal.pipeline.index.failPipeline, {
         pipelineId,
         error: error.message,
       });
