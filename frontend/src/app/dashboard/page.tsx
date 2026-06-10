@@ -7,7 +7,7 @@ import { useDropzone } from "react-dropzone";
 import { api } from "../../../convex/_generated/api";
 import Layout from "@/components/Layout";
 import { useMutation, useAction } from "convex/react";
-import { formatBytes, formatDuration, cn } from "@/lib/utils";
+import { formatBytes, cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -176,18 +176,17 @@ function QuickUploadZone({ onUploadComplete }: { onUploadComplete: (uploadId: st
       toast.success("File uploaded!");
 
       // Run pipeline
-      setProgress(0);
       const pipelineResult = await runPipeline({
         uploadId,
         datasetId,
         userId: user._id || "" as any,
         skipCleaning: false,
-      });
+      }) as { status: string; error?: string };
 
       if (pipelineResult.status === "completed") {
         toast.success("Pipeline completed! Dashboard created.");
       } else {
-        toast.error("Pipeline failed: " + (pipelineResult as any).error);
+        toast.error("Pipeline failed: " + (pipelineResult.error || "Unknown error"));
       }
       onUploadComplete(uploadId);
     } catch (err: any) {
