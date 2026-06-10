@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -10,6 +10,7 @@ import ConvexChartBuilder from "@/components/ConvexChartBuilder";
 
 export default function DashboardBuilderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Load user info
   const [storedUser] = useState(() => {
@@ -23,7 +24,15 @@ export default function DashboardBuilderPage() {
 
   // Load user uploads
   const uploads = useQuery(api.uploads.listUploads, userId ? { userId } : "skip");
-  const [selectedUploadId, setSelectedUploadId] = useState<string>("");
+  const [selectedUploadId, setSelectedUploadId] = useState<string>(searchParams.get("uploadId") || "");
+
+  // Sync uploadId from URL params
+  useEffect(() => {
+    const urlUploadId = searchParams.get("uploadId");
+    if (urlUploadId && urlUploadId !== selectedUploadId) {
+      setSelectedUploadId(urlUploadId);
+    }
+  }, [searchParams]);
 
   const uploadList = (uploads || []) as Array<{ _id: string; fileName: string; status: string }>;
   const completedUploads = uploadList.filter((u) => u.status === "completed");

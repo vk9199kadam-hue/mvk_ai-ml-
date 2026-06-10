@@ -120,10 +120,14 @@ export const runPipeline = action({
       const numericCols = columns.filter(col =>
         data.some(row => typeof row[col] === 'number')
       );
+      // Get upload details for the title
+      const uploadRecord = await ctx.runQuery(internal.uploads.getUpload, {
+        uploadId: args.uploadId,
+      });
       await ctx.runMutation(internal.dashboards.createDashboard, {
         uploadId: args.uploadId,
         userId: args.userId,
-        title: `Dashboard - ${dataset.fileName || 'Untitled'}`,
+        title: `Dashboard - ${(uploadRecord as any)?.fileName || 'Untitled'}`,
         columns,
         numericColumns: numericCols,
         relationships: langGraphResult.relationships || [],

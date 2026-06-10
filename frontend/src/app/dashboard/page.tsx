@@ -248,8 +248,9 @@ export default function DashboardPage() {
   });
   const userId = storedUser?._id as Id<"users"> | undefined;
 
-  // Get reports list from Convex (will be null until user is logged in)
+  // Get reports AND dashboards from Convex
   const reports = useQuery(api.reports.listReports, userId ? { userId } : "skip");
+  const dashboards = useQuery(api.dashboards.listDashboards, userId ? { userId } : "skip");
 
   const handleUploadComplete = (uploadId: string) => {
     router.push("/upload");
@@ -296,12 +297,12 @@ export default function DashboardPage() {
             color="bg-blue-50 text-blue-600"
           />
           <StatusCard
-            title="Reports Generated"
-            value={reports?.length || 0}
+            title="Dashboards"
+            value={dashboards?.length || 0}
             subtitle="Ready to view"
             icon={
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
               </svg>
             }
             color="bg-purple-50 text-purple-600"
@@ -328,6 +329,79 @@ export default function DashboardPage() {
             }
             color="bg-orange-50 text-orange-600"
           />
+        </div>
+
+        {/* Your Dashboards Section */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Your Dashboards</h2>
+            <button
+              onClick={() => router.push("/dashboard/builder")}
+              className="btn-secondary text-sm !px-3 !py-1.5"
+            >
+              + New Dashboard
+            </button>
+          </div>
+          {dashboards === undefined ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="card p-6 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-3" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : dashboards && dashboards.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {dashboards.map((db: any) => {
+                const widgetCount = db.widgets ? Object.keys(db.widgets).length : 0;
+                return (
+                  <button
+                    key={db._id}
+                    onClick={() => router.push(`/dashboard/builder?uploadId=${db.uploadId}`)}
+                    className="card p-6 text-left hover:shadow-md hover:border-blue-200 transition-all group"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {new Date(db.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                      {db.title}
+                    </h3>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                      <span>{widgetCount} widget{widgetCount !== 1 ? 's' : ''}</span>
+                      <span>•</span>
+                      <span>{db.layout?.length || 0} layout items</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="card p-10 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Dashboards Yet</h3>
+              <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">
+                Upload a CSV file and run the pipeline to auto-generate a dashboard with KPIs, charts, and insights.
+              </p>
+              <button
+                onClick={() => router.push("/upload")}
+                className="btn-primary"
+              >
+                Upload Your First Dataset
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Active Pipeline */}
@@ -375,7 +449,7 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500 mt-1">Query your data using natural language</p>
           </button>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/dashboard/builder")}
             className="card p-6 hover:shadow-md hover:border-green-200 transition-all group text-left"
           >
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-green-200 transition-colors">
@@ -383,8 +457,8 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <h3 className="font-semibold text-gray-900">View Reports</h3>
-            <p className="text-sm text-gray-500 mt-1">Browse generated analytical reports</p>
+            <h3 className="font-semibold text-gray-900">Chart Builder</h3>
+            <p className="text-sm text-gray-500 mt-1">Build custom dashboards and charts</p>
           </button>
         </div>
       </div>
