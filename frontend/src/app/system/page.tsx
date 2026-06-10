@@ -47,7 +47,7 @@ function StatusCard({ label, value, status, icon }: StatusCardProps) {
 export default function SystemPage() {
   const services = [
     { label: "Convex Cloud", value: "Connected", status: "healthy" as const },
-    { label: "Database", value: "7 tables, 9 indexes", status: "healthy" as const },
+    { label: "Database", value: "13 tables, 16 indexes", status: "healthy" as const },
     { label: "LLM Provider", value: "OpenRouter (Free Tier)", status: "healthy" as const },
     { label: "File Storage", value: "Convex Storage", status: "healthy" as const },
   ];
@@ -125,6 +125,10 @@ export default function SystemPage() {
                   ["datasets", "Stored CSV data", "by_upload"],
                   ["auditLog", "Enterprise audit trail", "by_user, by_resource, by_timestamp"],
                   ["prompts", "Versioned prompt templates", "by_name"],
+                  ["datasetRelations", "Dataset relationships for multi-dataset joins (V4)", "by_user"],
+                  ["joinedDatasets", "Joined datasets cache (V4)", "by_user, by_relation"],
+                  ["scheduledReports", "Scheduled email report configuration (V5)", "by_user"],
+                  ["reportVersions", "Report version history & edits (V5)", "by_report"],
                 ].map(([table, purpose, indexes]) => (
                   <tr key={table} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-2 px-3 font-mono text-blue-600 text-xs">{table}</td>

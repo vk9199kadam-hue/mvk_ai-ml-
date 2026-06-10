@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 
@@ -31,12 +31,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const createUser = useMutation(api.users.createUser);
+  const convex = useConvex();
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser);
+        if (!parsed || !parsed._id) {
+          localStorage.removeItem("user");
+          setUser(null);
+        } else {
+          setUser(parsed);
+        }
       } catch {
         localStorage.removeItem("user");
       }
@@ -67,22 +74,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
     } catch (err: any) {
       if (err.message?.includes("already exists")) {
-        // User exists — "log in" with stored data
-        const userData: User = {
-          _id: "" as any,
-          email,
-          name: email.split("@")[0],
-          role: "analyst",
-          createdAt: Date.now(),
-          is_active: true,
-        } as any;
-        localStorage.setItem("user", JSON.stringify(userData));
-        setUser(userData);
+        // User exists — "log in" with stored data by querying their record
+        const existingUser = await convex.query(api.users.getUser, { email });
+        if (existingUser) {
+          const userData: User = {
+            _id: existingUser._id,
+            email: existingUser.email,
+            name: existingUser.name,
+            role: existingUser.role,
+            createdAt: existingUser.createdAt,
+            is_active: true,
+          } as any;
+          localStorage.setItem("user", JSON.stringify(userData));
+          setUser(userData);
+        } else {
+          throw new Error("User exists but details could not be retrieved.");
+        }
       } else {
         throw err;
       }
     }
-  }, [createUser]);
+  }, [createUser, convex]);
 
   const register = useCallback(async (email: string, password: string, name: string) => {
     const passwordHash = await simpleHash(password);

@@ -93,11 +93,39 @@ export default function NLQChatPage() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [datasetId, setDatasetId] = useState("default-dataset");
+  const [selectedUploadId, setSelectedUploadId] = useState<string>("");
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const [chartData, setChartData] = useState<Record<string, any>[] | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { showReasoning, toggleReasoning } = useNlqStore();
+
+  // Load user info
+  const [storedUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      const u = localStorage.getItem("user");
+      return u ? JSON.parse(u) : null;
+    }
+    return null;
+  });
+  const userId = storedUser?._id as Id<"users"> | undefined;
+
+  // Load user uploads
+  const uploads = useQuery(api.uploads.listUploads, userId ? { userId } : "skip");
+  const uploadList = (uploads || []) as Array<{ _id: string; fileName: string; status: string }>;
+  const completedUploads = uploadList.filter((u) => u.status === "completed");
+
+  // Automatically select first completed upload if none is selected
+  useEffect(() => {
+    if (!selectedUploadId && completedUploads.length > 0) {
+      setSelectedUploadId(completedUploads[0]._id);
+    }
+  }, [completedUploads, selectedUploadId]);
+
+  // Load dataset for the selected upload ID
+  const dataset = useQuery(
+    api.datasets.getDatasetByUpload,
+    selectedUploadId ? { uploadId: selectedUploadId as Id<"uploads"> } : "skip"
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -111,6 +139,21 @@ export default function NLQChatPage() {
     const question = input.trim();
     if (!question || isLoading) return;
 
+    if (!userId) {
+      toast.error("You must be logged in");
+      return;
+    }
+
+    if (!selectedUploadId) {
+      toast.error("Please upload or select a dataset first");
+      return;
+    }
+
+    if (!dataset?._id) {
+      toast.error("Dataset loading. Please wait...");
+      return;
+    }
+
     setInput("");
     setIsLoading(true);
 
@@ -121,17 +164,12 @@ export default function NLQChatPage() {
     setMessages((prev) => [...prev, userMessage]);
 
     try {
-      // Get stored user
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) throw new Error("Must be logged in");
-      const user = JSON.parse(storedUser);
-
       // Create conversation if first message
       let convId = conversationId;
       if (!convId) {
         const { conversationId: newConvId } = await createConversation({
-          userId: user._id || "" as any,
-          uploadId: datasetId as any || "" as any,
+          userId: userId,
+          uploadId: selectedUploadId as Id<"uploads">,
         });
         convId = newConvId;
         setConversationId(convId);
@@ -139,9 +177,9 @@ export default function NLQChatPage() {
 
       // Call Convex NLQ action
       const response = await nlqQuery({
-        userId: user._id || "" as any,
-        uploadId: datasetId as any || "" as any,
-        datasetId: datasetId as any || "" as any,
+        userId: userId,
+        uploadId: selectedUploadId as Id<"uploads">,
+        datasetId: dataset._id,
         conversationId: convId as any,
         question,
       });
@@ -195,13 +233,28 @@ export default function NLQChatPage() {
             </p>
           </div>
           <select
-            value={datasetId}
-            onChange={(e) => setDatasetId(e.target.value)}
-            className="input-field w-48"
+            value={selectedUploadId}
+            onChange={(e) => {
+              setSelectedUploadId(e.target.value);
+              setConversationId(undefined);
+              setMessages([
+                {
+                  id: "welcome",
+                  role: "assistant",
+                  content: "👋 Welcome to AutoInsight AI!\n\nI can help you explore and analyze your data using natural language. Try asking about trends, correlations, or request a dashboard layout.\n\n**Sample questions:**\n- *\"What are the key trends in this dataset?\"*\n- *\"Show me the correlation between age and salary\"*\n- *\"Create a dashboard layout\"*",
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+              setChartData(null);
+            }}
+            className="input-field w-64"
           >
-            <option value="default-dataset">Current Dataset</option>
-            <option value="sample-sales">Sample: Sales Data</option>
-            <option value="sample-hr">Sample: HR Data</option>
+            <option value="">Select a dataset...</option>
+            {completedUploads.map((u) => (
+              <option key={u._id} value={u._id}>
+                {u.fileName}
+              </option>
+            ))}
           </select>
         </div>
 
