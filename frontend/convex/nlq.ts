@@ -168,8 +168,8 @@ export const query = action({
           conversationId: args.conversationId,
           role: "assistant",
           content: synthesized.answer,
-          sqlGenerated: sqlQuery || null,
-          chartConfig: synthesized.chartConfig || null,
+          sqlGenerated: sqlQuery || undefined,
+          chartConfig: synthesized.chartConfig || undefined,
         });
 
         return {
@@ -192,8 +192,8 @@ export const query = action({
       conversationId: args.conversationId,
       role: "assistant",
       content: answerText,
-      sqlGenerated: sqlQuery || null,
-      chartConfig: null,
+      sqlGenerated: sqlQuery || undefined,
+      chartConfig: undefined,
     });
 
     return {

@@ -116,6 +116,20 @@ export const runPipeline = action({
         processingTimeMs,
       });
 
+      // Auto-create dashboard for this upload
+      const numericCols = columns.filter(col =>
+        data.some(row => typeof row[col] === 'number')
+      );
+      await ctx.runMutation(internal.dashboards.createDashboard, {
+        uploadId: args.uploadId,
+        userId: args.userId,
+        title: `Dashboard - ${dataset.fileName || 'Untitled'}`,
+        columns,
+        numericColumns: numericCols,
+        relationships: langGraphResult.relationships || [],
+        rowCount: data.length,
+      });
+
       // Update upload status
       await ctx.runMutation(internal.uploads.updateUploadStatus, {
         uploadId: args.uploadId,
